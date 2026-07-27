@@ -1178,6 +1178,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/account/merge/confirm", func(w http.ResponseWriter, r *http.Request) {
 		PersonMergeConfirmationAccept(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/auth/status", func(w http.ResponseWriter, r *http.Request) {
+		AuthStatus(w, r, app)
+	}).Methods("GET")
 	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		LogoutHandler(w, r, app)
 	}).Methods("POST")
