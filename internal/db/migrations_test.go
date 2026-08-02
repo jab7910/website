@@ -38,6 +38,29 @@ func TestLoadMigrationsRejectsDuplicateVersions(t *testing.T) {
 	}
 }
 
+func TestNewMigrationsLeaveTransactionControlToRunner(t *testing.T) {
+	// These migrations were corrected before shipping. Other migrations may
+	// already be applied and cannot be edited without invalidating checksums.
+	checkedVersions := map[int]bool{33: true, 34: true, 35: true, 38: true}
+	migrations, err := LoadMigrations(filepath.Join("..", "..", "db", "migrations"))
+	if err != nil {
+		t.Fatalf("LoadMigrations: %v", err)
+	}
+
+	for _, migration := range migrations {
+		if !checkedVersions[migration.Version] {
+			continue
+		}
+		for lineNumber, line := range strings.Split(migration.SQL, "\n") {
+			statement := strings.ToUpper(strings.TrimSuffix(strings.TrimSpace(line), ";"))
+			switch statement {
+			case "BEGIN", "COMMIT", "ROLLBACK":
+				t.Errorf("migration %03d contains %s on line %d; the migration runner owns the transaction", migration.Version, statement, lineNumber+1)
+			}
+		}
+	}
+}
+
 func writeMigration(t *testing.T, dir string, name string, sql string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(sql), 0644); err != nil {
