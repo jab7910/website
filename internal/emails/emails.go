@@ -71,7 +71,7 @@ func (f *EmailFile) payload() []byte {
 
 func RegisterEndpoints(r *mux.Router, ctx *config.AppContext) {
 	r.HandleFunc("/welcome-email", func(w http.ResponseWriter, r *http.Request) {
-		TicketCheck(w, r, ctx)
+		TicketCheck(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("GET")
 
 	r.HandleFunc("/trial-email", func(w http.ResponseWriter, r *http.Request) {

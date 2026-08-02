@@ -70,19 +70,20 @@ func registerConferenceHackathonAdminRoutes(r *mux.Router, app *config.AppContex
 
 func conferenceHackathonAdminHandler(app *config.AppContext, next hackathonAdminHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		scoped := requestApp(r, app)
 		confTag := strings.TrimSpace(mux.Vars(r)["conf"])
-		conf, err := getters.GetConfByTag(app, confTag)
+		conf, err := getters.GetConfByTag(scoped, confTag)
 		if err != nil || conf == nil {
-			handle404(w, r, app)
+			handle404(w, r, scoped)
 			return
 		}
-		competition, err := getters.GetCompetitionByConferenceID(app, conf.Ref)
+		competition, err := getters.GetCompetitionByConferenceID(scoped, conf.Ref)
 		if err != nil || competition == nil {
-			handle404(w, r, app)
+			handle404(w, r, scoped)
 			return
 		}
 		vars := mux.Vars(r)
 		vars["competitionID"] = competition.ID
-		next(w, mux.SetURLVars(r, vars), app)
+		next(w, mux.SetURLVars(r, vars), scoped)
 	}
 }

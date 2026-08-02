@@ -21,31 +21,31 @@ import (
 
 func RegisterNewsletterHandlers(r *mux.Router, ctx *config.AppContext) {
 	r.HandleFunc("/{newsletter}/subscribe", func(w http.ResponseWriter, r *http.Request) {
-		SubscribeEmail(w, r, ctx)
+		SubscribeEmail(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("POST")
 
 	r.HandleFunc("/confirm/{token}", func(w http.ResponseWriter, r *http.Request) {
-		ConfirmEmail(w, r, ctx)
+		ConfirmEmail(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("GET")
 
 	r.HandleFunc("/newsletter/unsubscribe/{token}", func(w http.ResponseWriter, r *http.Request) {
-		UnsubscribeEmail(w, r, ctx)
+		UnsubscribeEmail(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("GET")
 
 	r.HandleFunc("/{newsletter}/schedule", func(w http.ResponseWriter, r *http.Request) {
-		ScheduleNewsMissives(w, r, ctx)
+		ScheduleNewsMissives(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("GET")
 
 	r.HandleFunc("/missives/unschedule/MISS-{uid}", func(w http.ResponseWriter, r *http.Request) {
-		UnscheduleNewsMissive(w, r, ctx)
+		UnscheduleNewsMissive(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("GET")
 
 	r.HandleFunc("/missives/preview/MISS-{uid}", func(w http.ResponseWriter, r *http.Request) {
-		PreviewMissive(w, r, ctx)
+		PreviewMissive(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("GET")
 
 	r.HandleFunc("/missives/port/{conf}", func(w http.ResponseWriter, r *http.Request) {
-		PortRegistrationsToNewsletters(w, r, ctx)
+		PortRegistrationsToNewsletters(w, r, ctx.WithDatabaseContext(r.Context()))
 	}).Methods("GET")
 }
 
