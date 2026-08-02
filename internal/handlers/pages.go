@@ -1225,13 +1225,6 @@ type EmailComposeData struct {
 	OnSubExpiry      string
 }
 
-type SponsorFormPage struct {
-	Confs       []*types.Conf
-	ConfItems   []types.CheckItem
-	SponsorOpps []types.CheckItem
-	Year        uint
-}
-
 type SatelliteEventFormPage struct {
 	Conf         *types.Conf
 	FlashMessage string
