@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	texttemplate "text/template"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/mtypes"
@@ -96,7 +95,7 @@ func TestSendWeeklyNewsletterDraftReviewIncludesDirectEditorLink(t *testing.T) {
 			MailerSecret: "test-secret",
 		},
 		Infos:         log.New(io.Discard, "", 0),
-		EmailCache:    make(map[string]*texttemplate.Template),
+		EmailCache:    config.TextTemplateCache{},
 		TemplateCache: htmltemplate.Must(htmltemplate.New("root").Parse(`{{ define "emails/rebrand.tmpl" }}<html><body><main>{{ .Content }}</main></body></html>{{ end }}`)),
 	}
 	letter := &mtypes.Letter{

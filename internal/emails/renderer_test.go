@@ -2,11 +2,12 @@ package emails
 
 import (
 	"bytes"
+	"fmt"
 	htmltemplate "html/template"
 	"os"
 	"strings"
+	"sync"
 	"testing"
-	texttemplate "text/template"
 	"time"
 
 	"btcpp-web/internal/config"
@@ -16,9 +17,7 @@ import (
 )
 
 func TestMissiveTemplateDoesNotHTMLEscapePlainTextURLs(t *testing.T) {
-	ctx := &config.AppContext{
-		EmailCache: make(map[string]*texttemplate.Template),
-	}
+	ctx := &config.AppContext{}
 	letter := &mtypes.Letter{
 		UID:      1,
 		Markdown: "Open {{ .URL }}",
@@ -48,7 +47,6 @@ func TestConferenceCampaignPreviewUsesNewsletterWrapper(t *testing.T) {
 	}
 	ctx := &config.AppContext{
 		Env:           &types.EnvConfig{Host: "localhost:8888"},
-		EmailCache:    make(map[string]*texttemplate.Template),
 		TemplateCache: htmltemplate.Must(htmltemplate.New("").New("emails/rebrand.tmpl").Parse(string(rebrand))),
 	}
 	letter := &mtypes.Letter{
@@ -80,7 +78,6 @@ func TestConferenceCampaignDefaultUsesNewsletterSections(t *testing.T) {
 	}
 	ctx := &config.AppContext{
 		Env:           &types.EnvConfig{Host: "localhost:8888"},
-		EmailCache:    make(map[string]*texttemplate.Template),
 		TemplateCache: htmltemplate.Must(htmltemplate.New("").New("emails/rebrand.tmpl").Parse(string(rebrand))),
 	}
 	letter := &mtypes.Letter{UID: 43, Title: "✨ bitcoin++ dev26 ++: We're getting closer", OnlyFor: mtypes.OnlyForTemplated, Markdown: definition.Markdown}
@@ -188,7 +185,7 @@ ticker:
 		Markdown: string(markdown),
 	}
 	var rendered bytes.Buffer
-	if err := executeMissiveTemplate(&config.AppContext{EmailCache: map[string]*texttemplate.Template{}}, letter, &rendered, &mtypes.EmailContent{URI: "https://btcpp.dev"}); err != nil {
+	if err := executeMissiveTemplate(&config.AppContext{}, letter, &rendered, &mtypes.EmailContent{URI: "https://btcpp.dev"}); err != nil {
 		t.Fatalf("execute templated missive: %v", err)
 	}
 
@@ -233,7 +230,7 @@ ticker:
 }
 
 func TestMissiveTemplateReturnsMalformedInlineButtonError(t *testing.T) {
-	ctx := &config.AppContext{EmailCache: map[string]*texttemplate.Template{}}
+	ctx := &config.AppContext{}
 	letter := &mtypes.Letter{
 		UID:      43,
 		OnlyFor:  mtypes.OnlyForTemplated,
@@ -250,6 +247,41 @@ func TestMissiveTemplateReturnsMalformedInlineButtonError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `inline buttons use {{ button "Label" "https://example.com" }}`) {
 		t.Fatalf("error = %q, want corrected syntax", err)
+	}
+}
+
+func TestMissiveTemplateCacheIsSafeForConcurrentUse(t *testing.T) {
+	ctx := &config.AppContext{}
+	letter := &mtypes.Letter{UID: 7, Markdown: "Hello {{ .Name }}"}
+
+	const workers = 64
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var out bytes.Buffer
+			if err := executeMissiveTemplate(ctx, letter, &out, map[string]string{"Name": "Nifty"}); err != nil {
+				errCh <- err
+				return
+			}
+			if got := out.String(); got != "Hello Nifty" {
+				errCh <- fmt.Errorf("rendered %q", got)
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Errorf("concurrent render: %v", err)
+	}
+}
+
+func TestMissiveTemplateReturnsParseErrors(t *testing.T) {
+	_, err := missiveTemplate(&config.AppContext{}, &mtypes.Letter{UID: 8, Markdown: "{{ broken"})
+	if err == nil {
+		t.Fatal("missiveTemplate returned nil error for invalid template")
 	}
 }
 
