@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"strings"
@@ -89,7 +90,44 @@ const (
 	devNewsletterRecording2  = "00000000-0000-4000-8000-000000000b22"
 	devNewsletterRecording3  = "00000000-0000-4000-8000-000000000b23"
 	devNewsletterRecording4  = "00000000-0000-4000-8000-000000000b24"
+	devHackathonSegment1     = "00000000-0000-4000-8000-000000000b31"
+	devHackathonSegment2     = "00000000-0000-4000-8000-000000000b32"
+	devHackathonSegment3     = "00000000-0000-4000-8000-000000000b33"
+	devHackathonSegment4     = "00000000-0000-4000-8000-000000000b34"
+	devHackathonSegment5     = "00000000-0000-4000-8000-000000000b35"
+	devHackathonSegment6     = "00000000-0000-4000-8000-000000000b36"
+	devHackathonProposal1    = "00000000-0000-4000-8000-000000000b41"
+	devHackathonProposal2    = "00000000-0000-4000-8000-000000000b42"
+	devHackathonProposal3    = "00000000-0000-4000-8000-000000000b43"
+	devHackathonProposal4    = "00000000-0000-4000-8000-000000000b44"
+	devHackathonProposal5    = "00000000-0000-4000-8000-000000000b45"
+	devHackathonProposal6    = "00000000-0000-4000-8000-000000000b46"
+	devHackathonTalk1        = "00000000-0000-4000-8000-000000000b51"
+	devHackathonTalk2        = "00000000-0000-4000-8000-000000000b52"
+	devHackathonTalk3        = "00000000-0000-4000-8000-000000000b53"
+	devHackathonTalk4        = "00000000-0000-4000-8000-000000000b54"
+	devHackathonTalk5        = "00000000-0000-4000-8000-000000000b55"
+	devHackathonTalk6        = "00000000-0000-4000-8000-000000000b56"
+	devHackathonExpoEvent    = "00000000-0000-4000-8000-000000000b61"
+	devHackathonFinalsEvent  = "00000000-0000-4000-8000-000000000b62"
+	devHackathonScorecard1   = "00000000-0000-4000-8000-000000000b71"
+	devHackathonScorecard2   = "00000000-0000-4000-8000-000000000b72"
+	devHackathonScorecard3   = "00000000-0000-4000-8000-000000000b73"
+	devHackathonScorecard4   = "00000000-0000-4000-8000-000000000b74"
+	devHackathonScorecard5   = "00000000-0000-4000-8000-000000000b75"
+	devHackathonScorecard6   = "00000000-0000-4000-8000-000000000b76"
+	devHackathonScorecard7   = "00000000-0000-4000-8000-000000000b77"
+	devHackathonScorecard8   = "00000000-0000-4000-8000-000000000b78"
+	devHackathonPrize1       = "00000000-0000-4000-8000-000000000b81"
+	devHackathonPrize2       = "00000000-0000-4000-8000-000000000b82"
+	devHackathonPrize3       = "00000000-0000-4000-8000-000000000b83"
+	devHackathonPrize4       = "00000000-0000-4000-8000-000000000b84"
+	devVolunteerRequestID    = "00000000-0000-4000-8000-000000000c01"
+	devMergeTargetPersonID   = "00000000-0000-4000-8000-000000000c11"
+	devMergeRequestID        = "00000000-0000-4000-8000-000000000c12"
 )
+
+const devVolunteerConfirmationToken = "dev-volunteer-confirmation-token"
 
 type daySeed struct {
 	id                           string
@@ -539,6 +577,7 @@ func main() {
 	seedDashboardFixtures(ctx, tx, confID, pastConfID)
 	seedCheckInPreviews(ctx, tx, confID)
 	seedMissives(ctx, tx)
+	seedPendingWorkflows(ctx, tx, confID)
 
 	if err := tx.Commit(ctx); err != nil {
 		log.Fatal(err)
@@ -1822,6 +1861,324 @@ func seedWeeklyNewsletterFixtures(ctx context.Context, tx pgx.Tx, confID string,
 				awarded_at = EXCLUDED.awarded_at
 		`, projectIDs[award.projectSlug], award.id)
 	}
+
+	seedHackathonOperations(ctx, tx, competitionID, projectIDs)
+}
+
+func seedHackathonOperations(ctx context.Context, tx pgx.Tx, competitionID string, projectIDs map[string]string) {
+	type scheduleSeed struct {
+		segmentID, proposalID, talkID, segmentType, title, startsAt, endsAt string
+		duration, ordering                                                  int
+	}
+	schedule := []scheduleSeed{
+		{devHackathonSegment1, devHackathonProposal1, devHackathonTalk1, "kickoff", "Kickoff", "2026-10-01 09:00:00-05", "2026-10-01 09:30:00-05", 30, 0},
+		{devHackathonSegment2, devHackathonProposal2, devHackathonTalk2, "hacking", "Hacking time", "2026-10-01 09:30:00-05", "2026-10-01 11:30:00-05", 120, 1},
+		{devHackathonSegment3, devHackathonProposal3, devHackathonTalk3, "judges-meeting", "Judges meeting", "2026-10-03 13:30:00-05", "2026-10-03 14:00:00-05", 30, 2},
+		{devHackathonSegment4, devHackathonProposal4, devHackathonTalk4, "expo", "Project expo", "2026-10-03 14:00:00-05", "2026-10-03 15:00:00-05", 60, 3},
+		{devHackathonSegment5, devHackathonProposal5, devHackathonTalk5, "finals", "Finals", "2026-10-03 15:15:00-05", "2026-10-03 16:00:00-05", 45, 4},
+		{devHackathonSegment6, devHackathonProposal6, devHackathonTalk6, "awards", "Awards", "2026-10-03 16:00:00-05", "2026-10-03 16:30:00-05", 30, 5},
+	}
+	segmentIDs := make([]string, 0, len(schedule))
+	for _, segment := range schedule {
+		segmentIDs = append(segmentIDs, segment.segmentID)
+	}
+
+	// The seed owns this competition's schedule. Archive incidental entries from
+	// older seed versions before installing the deterministic fixture.
+	mustExec(ctx, tx, "archive obsolete hackathon schedule talks", `
+		UPDATE conf_talks
+		SET archived_at = now()
+		WHERE id IN (
+			SELECT conf_talk_id FROM competition_schedule_segments
+			WHERE competition_id = $1::uuid
+				AND id::text <> ALL($2::text[])
+				AND conf_talk_id IS NOT NULL
+		)
+	`, competitionID, segmentIDs)
+	mustExec(ctx, tx, "retire obsolete hackathon schedule proposals", `
+		UPDATE proposals
+		SET status = 'TheyDecline'
+		WHERE id IN (
+			SELECT proposal_id FROM competition_schedule_segments
+			WHERE competition_id = $1::uuid
+				AND id::text <> ALL($2::text[])
+				AND proposal_id IS NOT NULL
+		)
+	`, competitionID, segmentIDs)
+	mustExec(ctx, tx, "remove obsolete hackathon schedule segments", `
+		DELETE FROM competition_schedule_segments
+		WHERE competition_id = $1::uuid AND id::text <> ALL($2::text[])
+	`, competitionID, segmentIDs)
+
+	for _, segment := range schedule {
+		mustExec(ctx, tx, "seed hackathon schedule proposal", `
+			INSERT INTO proposals (
+				id, conference_id, title, description, setup, comments, talk_type,
+				status, desired_duration_min, avail_duration_min, invite_token
+			)
+			SELECT $1::uuid, conference_id, $3, '', '',
+				'Seeded hackathon schedule entry.', 'hackathon', 'Scheduled', $4, $4, ''
+			FROM competitions WHERE id = $2::uuid
+			ON CONFLICT (id) DO UPDATE SET
+				conference_id = EXCLUDED.conference_id,
+				title = EXCLUDED.title,
+				talk_type = EXCLUDED.talk_type,
+				status = EXCLUDED.status,
+				desired_duration_min = EXCLUDED.desired_duration_min,
+				avail_duration_min = EXCLUDED.avail_duration_min
+		`, segment.proposalID, competitionID, "Signet Builders Sprint: "+segment.title, segment.duration)
+		mustExec(ctx, tx, "seed hackathon schedule talk", `
+			INSERT INTO conf_talks (
+				id, conference_id, proposal_id, clipart_path, scheduled_start,
+				scheduled_end, production_notes, venue, section, cal_notif,
+				social_card_path
+			)
+			SELECT $1::uuid, conference_id, $3::uuid, '', $4::timestamptz,
+				$5::timestamptz, 'Seeded hackathon schedule entry.', 'one',
+				'hackathon', '', ''
+			FROM competitions WHERE id = $2::uuid
+			ON CONFLICT (id) DO UPDATE SET
+				conference_id = EXCLUDED.conference_id,
+				proposal_id = EXCLUDED.proposal_id,
+				scheduled_start = EXCLUDED.scheduled_start,
+				scheduled_end = EXCLUDED.scheduled_end,
+				production_notes = EXCLUDED.production_notes,
+				venue = EXCLUDED.venue,
+				section = EXCLUDED.section,
+				archived_at = NULL
+		`, segment.talkID, competitionID, segment.proposalID, segment.startsAt, segment.endsAt)
+		mustExec(ctx, tx, "seed hackathon schedule segment", `
+			INSERT INTO competition_schedule_segments (
+				id, competition_id, proposal_id, conf_talk_id, segment_type,
+				title, default_duration_minutes, ordering
+			)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, $7, $8)
+			ON CONFLICT (id) DO UPDATE SET
+				competition_id = EXCLUDED.competition_id,
+				proposal_id = EXCLUDED.proposal_id,
+				conf_talk_id = EXCLUDED.conf_talk_id,
+				segment_type = EXCLUDED.segment_type,
+				title = EXCLUDED.title,
+				default_duration_minutes = EXCLUDED.default_duration_minutes,
+				ordering = EXCLUDED.ordering
+		`, segment.segmentID, competitionID, segment.proposalID, segment.talkID,
+			segment.segmentType, segment.title, segment.duration, segment.ordering)
+	}
+
+	events := []struct {
+		id, segmentID, name, judgeType, startsAt, endsAt string
+		ordering, rankLimit                              int
+	}{
+		{devHackathonExpoEvent, devHackathonSegment4, "Project expo", "expo", "2026-10-03 14:00:00-05", "2026-10-03 15:00:00-05", 3, 4},
+		{devHackathonFinalsEvent, devHackathonSegment5, "Finals", "finals", "2026-10-03 15:15:00-05", "2026-10-03 16:00:00-05", 4, 4},
+	}
+	for _, event := range events {
+		mustExec(ctx, tx, "seed hackathon judge event", `
+			INSERT INTO judge_events (
+				id, competition_id, schedule_segment_id, name, playbook_type,
+				state, ordering, starts_at, ends_at, rank_limit
+			)
+			VALUES (
+				$1::uuid, $2::uuid, $3::uuid, $4, $5,
+				'closed', $6, $7::timestamptz, $8::timestamptz, $9
+			)
+			ON CONFLICT (id) DO UPDATE SET
+				competition_id = EXCLUDED.competition_id,
+				schedule_segment_id = EXCLUDED.schedule_segment_id,
+				name = EXCLUDED.name,
+				playbook_type = EXCLUDED.playbook_type,
+				state = EXCLUDED.state,
+				ordering = EXCLUDED.ordering,
+				starts_at = EXCLUDED.starts_at,
+				ends_at = EXCLUDED.ends_at,
+				rank_limit = EXCLUDED.rank_limit
+		`, event.id, competitionID, event.segmentID, event.name, event.judgeType,
+			event.ordering, event.startsAt, event.endsAt, event.rankLimit)
+	}
+
+	mustExec(ctx, tx, "reset seeded hackathon project members", `
+		DELETE FROM project_members
+		WHERE project_id::text = ANY($1::text[])
+	`, []string{projectIDs["mempool-observatory"], projectIDs["signet-arcade"]})
+	members := []struct{ projectID, personID, role string }{
+		{projectIDs["mempool-observatory"], devSpeakers[0].personID, "owner"},
+		{projectIDs["mempool-observatory"], devSpeakers[1].personID, "member"},
+		{projectIDs["signet-arcade"], devSpeakers[2].personID, "owner"},
+	}
+	for _, member := range members {
+		mustExec(ctx, tx, "seed hackathon project member", `
+			INSERT INTO project_members (project_id, person_id, role)
+			VALUES ($1::uuid, $2::uuid, $3)
+			ON CONFLICT (project_id, person_id) DO UPDATE SET role = EXCLUDED.role
+		`, member.projectID, member.personID, member.role)
+	}
+
+	mustExec(ctx, tx, "reset seeded competition judges", `
+		DELETE FROM competition_judges WHERE competition_id = $1::uuid
+	`, competitionID)
+	judges := []struct {
+		personID, judgeType, label string
+		order                      int
+	}{
+		{devSpeakers[3].personID, "expo", "Node House", 1},
+		{devSpeakers[4].personID, "expo", "Mempool Tools", 2},
+		{devSpeakers[4].personID, "finals", "Mempool Tools", 2},
+		{devSpeakers[5].personID, "finals", "FOSS Operations", 3},
+	}
+	for _, judge := range judges {
+		mustExec(ctx, tx, "seed competition judge", `
+			INSERT INTO competition_judges (
+				competition_id, person_id, judge_type, display_order, public_label_override
+			)
+			VALUES ($1::uuid, $2::uuid, $3, $4, $5)
+			ON CONFLICT (competition_id, person_id, judge_type) DO UPDATE SET
+				display_order = EXCLUDED.display_order,
+				public_label_override = EXCLUDED.public_label_override
+		`, competitionID, judge.personID, judge.judgeType, judge.order, judge.label)
+	}
+
+	mustExec(ctx, tx, "reset seeded award judges", `
+		DELETE FROM award_judges WHERE award_id = $1::uuid
+	`, devNewsletterAward3)
+	mustExec(ctx, tx, "seed award judge", `
+		INSERT INTO award_judges (award_id, person_id)
+		VALUES ($1::uuid, $2::uuid)
+		ON CONFLICT DO NOTHING
+	`, devNewsletterAward3, devSpeakers[5].personID)
+
+	scorecards := []struct {
+		id, eventID, projectID, judgeID, comments string
+		rank                                      int
+	}{
+		{devHackathonScorecard1, devHackathonExpoEvent, projectIDs["mempool-observatory"], devSpeakers[3].personID, "Strong operational visibility and a convincing demo.", 1},
+		{devHackathonScorecard2, devHackathonExpoEvent, projectIDs["signet-arcade"], devSpeakers[3].personID, "Excellent teaching flow; the prototype needs a little polish.", 2},
+		{devHackathonScorecard3, devHackathonExpoEvent, projectIDs["signet-arcade"], devSpeakers[4].personID, "The most approachable project in the Expo round.", 1},
+		{devHackathonScorecard4, devHackathonExpoEvent, projectIDs["mempool-observatory"], devSpeakers[4].personID, "Deep implementation with a steeper learning curve.", 2},
+		{devHackathonScorecard5, devHackathonFinalsEvent, projectIDs["mempool-observatory"], devSpeakers[4].personID, "Production-minded and immediately useful.", 1},
+		{devHackathonScorecard6, devHackathonFinalsEvent, projectIDs["signet-arcade"], devSpeakers[4].personID, "A polished and memorable final presentation.", 2},
+		{devHackathonScorecard7, devHackathonFinalsEvent, projectIDs["mempool-observatory"], devSpeakers[5].personID, "Best technical depth in the final round.", 1},
+		{devHackathonScorecard8, devHackathonFinalsEvent, projectIDs["signet-arcade"], devSpeakers[5].personID, "Very effective developer education concept.", 2},
+	}
+	for _, scorecard := range scorecards {
+		mustExec(ctx, tx, "seed hackathon scorecard", `
+			INSERT INTO scorecards (
+				id, judge_event_id, project_id, judge_person_id, rank, comments, submitted_at
+			)
+			VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, now() - interval '2 days')
+			ON CONFLICT (judge_event_id, project_id, judge_person_id) DO UPDATE SET
+				rank = EXCLUDED.rank,
+				comments = EXCLUDED.comments,
+				submitted_at = EXCLUDED.submitted_at
+		`, scorecard.id, scorecard.eventID, scorecard.projectID, scorecard.judgeID,
+			scorecard.rank, scorecard.comments)
+	}
+
+	prizes := []struct {
+		id, awardID, prizeType, title, description, value string
+	}{
+		{devHackathonPrize1, devNewsletterAward1, "sats", "First-place sats", "Paid to the winning team.", "500,000 sats"},
+		{devHackathonPrize2, devNewsletterAward1, "trophy", "Builder trophy", "A physical trophy for the winning project.", "One trophy"},
+		{devHackathonPrize3, devNewsletterAward2, "in_kind", "Hardware lab kit", "A development hardware bundle for the team.", "$1,000 value"},
+		{devHackathonPrize4, devNewsletterAward3, "tickets", "Next-edition passes", "Conference passes for the selected team.", "2 passes"},
+	}
+	for _, prize := range prizes {
+		mustExec(ctx, tx, "seed hackathon prize", `
+			INSERT INTO prizes (
+				id, award_id, prize_type, title, description, value_text, status, comments
+			)
+			VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, 'awarded', 'Local development fixture.')
+			ON CONFLICT (id) DO UPDATE SET
+				award_id = EXCLUDED.award_id,
+				prize_type = EXCLUDED.prize_type,
+				title = EXCLUDED.title,
+				description = EXCLUDED.description,
+				value_text = EXCLUDED.value_text,
+				status = EXCLUDED.status,
+				comments = EXCLUDED.comments
+		`, prize.id, prize.awardID, prize.prizeType, prize.title, prize.description, prize.value)
+	}
+}
+
+func seedPendingWorkflows(ctx context.Context, tx pgx.Tx, confID string) {
+	volunteerTokenHash := sha256.Sum256([]byte(devVolunteerConfirmationToken))
+	mustExec(ctx, tx, "seed pending volunteer verification", `
+		INSERT INTO volunteer_application_requests (
+			id, email, payload, token_hash, expires_at, consumed_at
+		)
+		VALUES (
+			$1::uuid, 'pending.volunteer@example.test',
+			jsonb_build_object(
+				'name', 'Pending Volunteer',
+				'phone', '+1 555 0166',
+				'signal', 'pending.volunteer.01',
+				'availability', jsonb_build_array('Day 1', 'Day 2'),
+				'contact_at', 'Signal',
+				'comments', 'Pending confirmation fixture for the volunteer flow.',
+				'discovered_via', 'A friend',
+				'conference_id', $2::text,
+				'other_events', '[]'::jsonb,
+				'work_yes', '[]'::jsonb,
+				'work_no', '[]'::jsonb,
+				'first_event', true,
+				'hometown', 'Austin, TX',
+				'twitter', '',
+				'nostr', '',
+				'shirt', 'MM',
+				'subscribe', true
+			),
+			$3, now() + interval '24 hours', NULL
+		)
+		ON CONFLICT (id) DO UPDATE SET
+			email = EXCLUDED.email,
+			payload = EXCLUDED.payload,
+			token_hash = EXCLUDED.token_hash,
+			expires_at = EXCLUDED.expires_at,
+			consumed_at = NULL
+	`, devVolunteerRequestID, confID, volunteerTokenHash[:])
+
+	mustExec(ctx, tx, "seed merge target person", `
+		INSERT INTO people (id, name, company, tshirt)
+		VALUES ($1::uuid, 'Dev Duplicate Profile', 'Legacy Dev Account', 'ML')
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			company = EXCLUDED.company,
+			tshirt = EXCLUDED.tshirt
+	`, devMergeTargetPersonID)
+	seedPersonEmail(ctx, tx, devMergeTargetPersonID, "dev-duplicate@example.test")
+	mustExec(ctx, tx, "remove competing seeded merge requests", `
+		DELETE FROM person_merge_requests
+		WHERE id <> $1::uuid
+			AND status IN ('awaiting_confirmation', 'pending')
+			AND least(requester_person_id, target_person_id) = least($2::uuid, $3::uuid)
+			AND greatest(requester_person_id, target_person_id) = greatest($2::uuid, $3::uuid)
+	`, devMergeRequestID, devAdminID, devMergeTargetPersonID)
+	mustExec(ctx, tx, "seed pending person merge request", `
+		INSERT INTO person_merge_requests (
+			id, requester_person_id, requester_name, requester_email,
+			target_person_id, target_name, target_email, status,
+			confirmation_token_hash, confirmation_expires_at, confirmed_at
+		)
+		VALUES (
+			$1::uuid, $2::uuid, 'Dev Admin', 'dev-admin@example.test',
+			$3::uuid, 'Dev Duplicate Profile', 'dev-duplicate@example.test', 'pending',
+			NULL, NULL, now()
+		)
+		ON CONFLICT (id) DO UPDATE SET
+			requester_person_id = EXCLUDED.requester_person_id,
+			requester_name = EXCLUDED.requester_name,
+			requester_email = EXCLUDED.requester_email,
+			target_person_id = EXCLUDED.target_person_id,
+			target_name = EXCLUDED.target_name,
+			target_email = EXCLUDED.target_email,
+			status = 'pending',
+			reviewed_by_person_id = NULL,
+			merge_event_id = NULL,
+			review_note = '',
+			reviewed_at = NULL,
+			confirmation_token_hash = NULL,
+			confirmation_expires_at = NULL,
+			confirmed_at = now()
+	`, devMergeRequestID, devAdminID, devMergeTargetPersonID)
 }
 
 func seedSponsors(ctx context.Context, tx pgx.Tx, confID string) {
