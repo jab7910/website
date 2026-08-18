@@ -33,10 +33,28 @@ func TestLoadTemplates(t *testing.T) {
 	if err := loadTemplates(ctx); err != nil {
 		t.Fatalf("loadTemplates: %v", err)
 	}
-	for _, name := range []string{"dashboard_hackathons.tmpl", "hackathon.tmpl", "hackathon_judging.tmpl", "hackathon_ballot_submitted.tmpl", "hackathon_project.tmpl", "hackathon_schedule.tmpl", "admin/hackathon_projects.tmpl", "admin/hackathon_judging.tmpl", "admin/hackathon_managers.tmpl", "admin/hackathon_scores.tmpl", "admin/hackathon_awards.tmpl", "admin/subscribers.tmpl", "admin/global_discounts.tmpl", "admin/inline_missive.tmpl", "admin/templated_missives_index.tmpl", "admin/conference_missives.tmpl"} {
+	for _, name := range []string{"dashboard_hackathons.tmpl", "hackathon.tmpl", "hackathon_judging.tmpl", "hackathon_ballot_submitted.tmpl", "hackathon_judging_results_live", "hackathon_project.tmpl", "hackathon_schedule.tmpl", "admin/hackathon_projects.tmpl", "admin/hackathon_judging.tmpl", "admin/hackathon_managers.tmpl", "admin/hackathon_scores.tmpl", "admin/hackathon_awards.tmpl", "admin/subscribers.tmpl", "admin/global_discounts.tmpl", "admin/inline_missive.tmpl", "admin/templated_missives_index.tmpl", "admin/conference_missives.tmpl"} {
 		if ctx.TemplateCache.Lookup(name) == nil {
 			t.Fatalf("template %s was not loaded", name)
 		}
+	}
+	liveTemplates, err := ctx.TemplateCache.Clone()
+	if err != nil {
+		t.Fatalf("clone templates for live judging results: %v", err)
+	}
+	var liveResults bytes.Buffer
+	if err := liveTemplates.ExecuteTemplate(&liveResults, "hackathon_judging_results_live", &HackathonPage{
+		Competition: &types.HackathonCompetition{ID: "competition-id"},
+		Conf:        &types.Conf{Tag: "toronto"},
+		JudgingResults: &HackathonJudgingResults{
+			Event:     &types.JudgeEvent{ID: "expo", Name: "Project expo", PlaybookType: getters.JudgeTypeExpo},
+			Summaries: []*HackathonScoreSummary{{ProjectID: "project-id", ProjectTitle: "Project", PointsLabel: "4", RankAverage: "1.0"}},
+		},
+	}); err != nil {
+		t.Fatalf("render live judging results: %v", err)
+	}
+	if !strings.Contains(liveResults.String(), "Live results") || !strings.Contains(liveResults.String(), "Project standings") {
+		t.Fatalf("live judging results missing expected content: %s", liveResults.String())
 	}
 	inlineTemplates, err := ctx.TemplateCache.Clone()
 	if err != nil {
